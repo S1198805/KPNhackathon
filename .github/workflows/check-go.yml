@@ -1,0 +1,20 @@
+name: Controleer Go-basis
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Controleer de code
+        run: go vet ./...
+      - name: Bouw het programma
+        run: go build -o checker ./cmd/checker
