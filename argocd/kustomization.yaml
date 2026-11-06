@@ -6,3 +6,4 @@ resources:
   - service.yaml
   - checker.yaml
   - checker-rbac.yaml
+  - readiness-checker-servicemonitor.yaml
