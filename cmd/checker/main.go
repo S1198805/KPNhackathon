@@ -32,6 +32,7 @@ type application struct {
 	mu          sync.RWMutex
 	result      report
 	lastSuccess int64
+	operators   operatorState
 }
 
 // Tokens are read for every scan because Kubernetes rotates them.
@@ -165,45 +166,69 @@ func (app *application) handler() http.Handler {
 	})
 	mux.HandleFunc("GET /report", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		result, _ := app.snapshot()
-		json.NewEncoder(w).Encode(result)
+		app.writeReport(w)
 	})
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-		result, last := app.snapshot()
-		fmt.Fprintln(w, "# TYPE upgrade_readiness_checker_info gauge")
-		fmt.Fprintln(w, `upgrade_readiness_checker_info{version="0.2.0"} 1`)
-		success := 0
-		if result.Status == "ok" || result.Status == "blocker" {
-			success = 1
+		nodes, nodeLast := app.snapshot()
+		ops, opLast := app.operators.snapshot()
+		nodeSuccess := nodes.Status == "ok" || nodes.Status == "blocker"
+		flag := func(value bool) int {
+			if value {
+				return 1
+			}
+			return 0
 		}
+		fmt.Fprintln(w, "# TYPE upgrade_readiness_checker_info gauge")
+		fmt.Fprintln(w, `upgrade_readiness_checker_info{version="0.3.0"} 1`)
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_check_success gauge")
-		fmt.Fprintf(w, "upgrade_readiness_check_success{check=\"nodes\"} %d\n", success)
+		fmt.Fprintf(w, "upgrade_readiness_check_success{check=%q} %d\n", "nodes", flag(nodeSuccess))
+		fmt.Fprintf(w, "upgrade_readiness_check_success{check=%q} %d\n", "operators", flag(ops.Success))
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_last_success_timestamp_seconds gauge")
-		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=\"nodes\"} %d\n", last)
-		if success == 0 {
+		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=%q} %d\n", "nodes", nodeLast)
+		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=%q} %d\n", "operators", opLast)
+		failures := 0
+		if nodeSuccess {
+			for _, node := range nodes.Nodes {
+				if node.Ready != "True" {
+					failures++
+				}
+			}
+		}
+		if nodeSuccess || ops.Success {
+			fmt.Fprintln(w, "# TYPE upgrade_readiness_findings gauge")
+			if nodeSuccess {
+				fmt.Fprintf(w, "upgrade_readiness_findings{check=%q,severity=%q} %d\n", "nodes", "blocker", failures)
+			}
+			if ops.Success {
+				for _, severity := range []string{"blocker", "warning", "unknown"} {
+					count := 0
+					for _, f := range ops.Findings {
+						if f.Severity == severity {
+							count++
+						}
+					}
+					fmt.Fprintf(w, "upgrade_readiness_findings{check=%q,severity=%q} %d\n", "operators", severity, count)
+				}
+			}
+		}
+		operatorMetrics(w, ops)
+		if !nodeSuccess {
 			return
 		}
-		failures := 0
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_node_ready gauge")
-		for _, n := range result.Nodes {
-			ready := 1
-			if n.Ready != "True" {
-				ready = 0
-				failures++
-			}
-			fmt.Fprintf(w, "upgrade_readiness_node_ready{node=%q} %d\n", n.Name, ready)
+		for _, node := range nodes.Nodes {
+			fmt.Fprintf(w, "upgrade_readiness_node_ready{node=%q} %d\n", node.Name, flag(node.Ready == "True"))
 		}
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_nodes_total gauge")
-		fmt.Fprintf(w, "upgrade_readiness_nodes_total %d\n", len(result.Nodes))
-		fmt.Fprintln(w, "# TYPE upgrade_readiness_findings gauge")
-		fmt.Fprintf(w, "upgrade_readiness_findings{check=\"nodes\",severity=\"blocker\"} %d\n", failures)
+		fmt.Fprintf(w, "upgrade_readiness_nodes_total %d\n", len(nodes.Nodes))
 	})
 	return mux
 }
 
 func main() {
 	app := &application{result: report{Status: "unknown", Error: "Eerste nodecontrole is nog niet afgerond", Nodes: []nodeResult{}}}
+	go app.operators.run()
 	go func() {
 		for {
 			app.scan()
@@ -211,6 +236,6 @@ func main() {
 		}
 	}()
 	server := &http.Server{Addr: ":8080", Handler: app.handler(), ReadHeaderTimeout: 5 * time.Second}
-	log.Println("Readiness checker 0.2.0 listening on port 8080")
+	log.Println("Readiness checker 0.3.0 listening on port 8080")
 	log.Fatal(server.ListenAndServe())
 }
