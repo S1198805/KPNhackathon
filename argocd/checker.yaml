@@ -19,7 +19,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: checker
-          image: ghcr.io/s1198805/upgrade-readiness-checker@sha256:e85a09cbea67adfc734a22bab2f7c2e8888e257f5fd6ecb31431f767bc1a504a
+          image: ghcr.io/s1198805/upgrade-readiness-checker@sha256:b081dc7f69f4767e589300e8dabb24c0a6d2ebb75b1da0ffdff267b5f1811fbe
           ports:
             - name: http
               containerPort: 8080
