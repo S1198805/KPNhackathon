@@ -1,0 +1,164 @@
+duration: 6h
+refreshInterval: 30s
+
+panels:
+
+  degraded-operators:
+    kind: Panel
+    spec:
+      display:
+        name: "Degraded Operators"
+        description: "Number of operators reporting Degraded=True"
+      plugin:
+        kind: TimeSeriesChart
+        spec: {}
+      queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: 'sum(upgrade_readiness_operator_condition{condition="Degraded",status="True"}) or vector(0)'
+
+  available-operators:
+    kind: Panel
+    spec:
+      display:
+        name: "Available Operators"
+      plugin:
+        kind: TimeSeriesChart
+        spec: {}
+      queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: 'sum(upgrade_readiness_operator_condition{condition="Available",status="True"}) or vector(0)'
+
+  upgrade-blockers:
+    kind: Panel
+    spec:
+      display:
+        name: "Upgrade Blockers"
+      plugin:
+        kind: TimeSeriesChart
+        spec: {}
+      queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: 'sum(upgrade_readiness_findings{severity="blocker"}) or vector(0)'
+
+  cluster-upgradeable:
+    kind: Panel
+    spec:
+      display:
+        name: "Cluster Upgradeable (1 = Yes, 0 = No)"
+      plugin:
+        kind: TimeSeriesChart
+        spec: {}
+      queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: 'count(upgrade_readiness_cluster_upgradeable{status="True"}) or vector(0)'
+
+  readiness-checks:
+    kind: Panel
+    spec:
+      display:
+        name: "Readiness Checks by Category"
+      plugin:
+        kind: TimeSeriesChart
+        spec: {}
+      queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: 'upgrade_readiness_check_success'
+
+  assessment-complete:
+    kind: Panel
+    spec:
+      display:
+        name: "Assessment Completion"
+      plugin:
+        kind: TimeSeriesChart
+        spec: {}
+      queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: 'upgrade_readiness_assessment_complete'
+
+layouts:
+  - kind: Grid
+    spec:
+      display:
+        title: "Upgrade Readiness Overview"
+        collapse:
+          open: true
+      items:
+        - x: 0
+          y: 0
+          width: 2
+          height: 3
+          content:
+            "$ref": "#/spec/panels/degraded-operators"
+        - x: 2
+          y: 0
+          width: 2
+          height: 3
+          content:
+            "$ref": "#/spec/panels/available-operators"
+        - x: 0
+          y: 3
+          width: 2
+          height: 3
+          content:
+            "$ref": "#/spec/panels/upgrade-blockers"
+        - x: 2
+          y: 3
+          width: 2
+          height: 3
+          content:
+            "$ref": "#/spec/panels/cluster-upgradeable"
+        - x: 0
+          y: 6
+          width: 2
+          height: 4
+          content:
+            "$ref": "#/spec/panels/readiness-checks"
+        - x: 2
+          y: 6
+          width: 2
+          height: 4
+          content:
+            "$ref": "#/spec/panels/assessment-complete"
