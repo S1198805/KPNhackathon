@@ -5,7 +5,7 @@ ARG TARGETARCH
 WORKDIR /src
 COPY go.* ./
 COPY cmd/ ./cmd/
-RUN go vet ./... && \
+RUN go test ./... && go vet ./... && \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
     -trimpath -ldflags="-s -w" -o /out/checker ./cmd/checker
 
