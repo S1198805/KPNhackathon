@@ -12,6 +12,8 @@ spec:
       labels:
         app: readiness-checker
     spec:
+      serviceAccountName: readiness-checker
+      automountServiceAccountToken: true
       securityContext:
         seccompProfile:
           type: RuntimeDefault

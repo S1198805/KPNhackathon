@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: readiness-checker
+  namespace: testapp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: upgrade-readiness-node-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: upgrade-readiness-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: readiness-checker
+    namespace: testapp
+roleRef:
+  kind: ClusterRole
+  name: upgrade-readiness-node-reader
+  apiGroup: rbac.authorization.k8s.io
