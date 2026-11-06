@@ -34,6 +34,7 @@ type application struct {
 	lastSuccess int64
 	operators   operatorState
 	pdbs        pdbState
+	apis        apiState
 }
 
 // Tokens are read for every scan because Kubernetes rotates them.
@@ -174,6 +175,7 @@ func (app *application) handler() http.Handler {
 		nodes, nodeLast := app.snapshot()
 		ops, opLast := app.operators.snapshot()
 		pdbs, pdbLast := app.pdbs.snapshot()
+		apis, apiLast := app.apis.snapshot()
 		nodeSuccess := nodes.Status == "ok" || nodes.Status == "blocker"
 		flag := func(value bool) int {
 			if value {
@@ -182,15 +184,17 @@ func (app *application) handler() http.Handler {
 			return 0
 		}
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_checker_info gauge")
-		fmt.Fprintln(w, `upgrade_readiness_checker_info{version="0.4.0"} 1`)
+		fmt.Fprintln(w, `upgrade_readiness_checker_info{version="0.5.0"} 1`)
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_check_success gauge")
 		fmt.Fprintf(w, "upgrade_readiness_check_success{check=%q} %d\n", "nodes", flag(nodeSuccess))
 		fmt.Fprintf(w, "upgrade_readiness_check_success{check=%q} %d\n", "operators", flag(ops.Success))
 		fmt.Fprintf(w, "upgrade_readiness_check_success{check=%q} %d\n", "pdbs", flag(pdbs.Success))
+		fmt.Fprintf(w, "upgrade_readiness_check_success{check=%q} %d\n", "apis", flag(apis.Success))
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_last_success_timestamp_seconds gauge")
 		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=%q} %d\n", "nodes", nodeLast)
 		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=%q} %d\n", "operators", opLast)
 		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=%q} %d\n", "pdbs", pdbLast)
+		fmt.Fprintf(w, "upgrade_readiness_last_success_timestamp_seconds{check=%q} %d\n", "apis", apiLast)
 		failures := 0
 		if nodeSuccess {
 			for _, node := range nodes.Nodes {
@@ -199,7 +203,7 @@ func (app *application) handler() http.Handler {
 				}
 			}
 		}
-		if nodeSuccess || ops.Success || pdbs.Success {
+		if nodeSuccess || ops.Success || pdbs.Success || apis.Success {
 			fmt.Fprintln(w, "# TYPE upgrade_readiness_findings gauge")
 			if nodeSuccess {
 				fmt.Fprintf(w, "upgrade_readiness_findings{check=%q,severity=%q} %d\n", "nodes", "blocker", failures)
@@ -227,11 +231,24 @@ func (app *application) handler() http.Handler {
 				fmt.Fprintf(w, "upgrade_readiness_findings{check=%q,severity=%q} %d\n", "pdbs", severity, count)
 			}
 		}
+		if apis.Success {
+			for _, severity := range []string{"blocker", "warning", "unknown"} {
+				count := 0
+				for _, f := range apis.Findings {
+					if f.Severity == severity {
+						count++
+					}
+				}
+				fmt.Fprintf(w, "upgrade_readiness_findings{check=%q,severity=%q} %d\n", "apis", severity, count)
+			}
+		}
 		fmt.Fprintln(w, "# TYPE upgrade_readiness_assessment_complete gauge")
 		fmt.Fprintf(w, "upgrade_readiness_assessment_complete{check=%q} %d\n", "operators", flag(ops.Success && ops.Complete))
 		fmt.Fprintf(w, "upgrade_readiness_assessment_complete{check=%q} %d\n", "pdbs", flag(pdbs.Success && pdbs.Complete))
+		fmt.Fprintf(w, "upgrade_readiness_assessment_complete{check=%q} %d\n", "apis", flag(apis.Success && apis.Complete))
 		operatorMetrics(w, ops)
 		pdbMetrics(w, pdbs)
+		apiMetrics(w, apis)
 		if !nodeSuccess {
 			return
 		}
@@ -249,6 +266,7 @@ func main() {
 	app := &application{result: report{Status: "unknown", Error: "Eerste nodecontrole is nog niet afgerond", Nodes: []nodeResult{}}}
 	go app.operators.run()
 	go app.pdbs.run()
+	go app.apis.run()
 	go func() {
 		for {
 			app.scan()
@@ -256,6 +274,6 @@ func main() {
 		}
 	}()
 	server := &http.Server{Addr: ":8080", Handler: app.handler(), ReadHeaderTimeout: 5 * time.Second}
-	log.Println("Readiness checker 0.4.0 listening on port 8080")
+	log.Println("Readiness checker 0.5.0 listening on port 8080")
 	log.Fatal(server.ListenAndServe())
 }

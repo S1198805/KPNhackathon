@@ -166,7 +166,7 @@ func TestPDBAPI(t *testing.T) {
 			if e := json.Unmarshal(rec.Body.Bytes(), &combined); e != nil {
 				t.Fatal(e)
 			}
-			if len(combined.Checks) != 3 || (tc.wantErr && combined.Status != "unknown") {
+			if len(combined.Checks) != 4 || (tc.wantErr && combined.Status != "unknown") {
 				t.Fatal(rec.Body.String())
 			}
 		})

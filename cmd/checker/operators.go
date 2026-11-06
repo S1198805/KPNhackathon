@@ -278,14 +278,15 @@ func (app *application) writeReport(w http.ResponseWriter) {
 	nodes, _ := app.snapshot()
 	operators, _ := app.operators.snapshot()
 	pdbs, _ := app.pdbs.snapshot()
+	apis, _ := app.apis.snapshot()
 	status := "ok"
-	if nodes.Status == "error" || nodes.Status == "unknown" || !operators.Success || !operators.Complete || !pdbs.Success || !pdbs.Complete {
+	if nodes.Status == "error" || nodes.Status == "unknown" || !operators.Success || !operators.Complete || !pdbs.Success || !pdbs.Complete || !apis.Success || !apis.Complete {
 		status = "unknown"
 	}
-	if status == "ok" && (operators.Status == "warning" || pdbs.Status == "warning") {
+	if status == "ok" && (operators.Status == "warning" || pdbs.Status == "warning" || apis.Status == "warning") {
 		status = "warning"
 	}
-	if nodes.Status == "blocker" || operators.Status == "blocker" || pdbs.Status == "blocker" {
+	if nodes.Status == "blocker" || operators.Status == "blocker" || pdbs.Status == "blocker" || apis.Status == "blocker" {
 		status = "blocker"
 	}
 	json.NewEncoder(w).Encode(struct {
@@ -295,10 +296,12 @@ func (app *application) writeReport(w http.ResponseWriter) {
 			Nodes     report         `json:"nodes"`
 			Operators operatorReport `json:"operators"`
 			PDBs      pdbReport      `json:"pdbs"`
+			APIs      apiReport      `json:"apis"`
 		} `json:"checks"`
-	}{status, "Node Ready, ClusterOperators en huidige PDB-drainbeperkingen; deprecated APIs en unsupported resources zijn nog niet beoordeeld", struct {
+	}{status, "Node Ready, ClusterOperators, huidige PDB-drainbeperkingen en APIRequestCount-gebruik; unsupported resources buiten verwijderde APIs zijn nog niet beoordeeld", struct {
 		Nodes     report         `json:"nodes"`
 		Operators operatorReport `json:"operators"`
 		PDBs      pdbReport      `json:"pdbs"`
-	}{nodes, operators, pdbs}})
+		APIs      apiReport      `json:"apis"`
+	}{nodes, operators, pdbs, apis}})
 }
