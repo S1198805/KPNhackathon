@@ -1,4 +1,4 @@
-
+---
 apiVersion: perses.dev/v1alpha1
 kind: PersesDashboard
 metadata:
@@ -6,202 +6,345 @@ metadata:
   namespace: testapp
 spec:
   display:
-    name: Upgrade Readiness Dashboard
-
-  duration: 6h
+    name: Platform Upgrade Readiness
+  duration: 1h
   refreshInterval: 30s
-
   panels:
-
     degraded-operators:
       kind: Panel
       spec:
         display:
-          name: "Degraded Operators"
-          description: "Number of operators reporting Degraded=True"
+          name: Degraded Operators
+          description: Number of operators reporting Degraded=True
         plugin:
-          kind: TimeSeriesChart
-          spec: {}
+          kind: StatChart
+          spec:
+            calculation: last
+            format:
+              unit: decimal
+              decimalPlaces: 0
+            thresholds:
+              mode: absolute
+              defaultColor: "#9CA3AF"
+              steps:
+              - value: 1
+                color: "#F59E0B"
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'sum(upgrade_readiness_operator_condition{condition="Degraded",status="True"}) or vector(0)'
-
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: sum(max by (operator) (upgrade_readiness_operator_condition{namespace="testapp",job="readiness-checker",condition="Degraded",status="True"})) or (0 * sum(upgrade_readiness_operator_condition{namespace="testapp",job="readiness-checker",condition="Degraded"}))
     available-operators:
       kind: Panel
       spec:
         display:
-          name: "Available Operators"
+          name: Available Operators
         plugin:
-          kind: TimeSeriesChart
-          spec: {}
+          kind: StatChart
+          spec:
+            calculation: last
+            format:
+              unit: decimal
+              decimalPlaces: 0
+            thresholds:
+              mode: absolute
+              defaultColor: "#9CA3AF"
+              steps:
+              - value: 1
+                color: "#3B82F6"
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'sum(upgrade_readiness_operator_condition{condition="Available",status="True"}) or vector(0)'
-
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: sum(max by (operator) (upgrade_readiness_operator_condition{namespace="testapp",job="readiness-checker",condition="Available",status="True"}))
     upgrade-blockers:
       kind: Panel
       spec:
         display:
-          name: "Upgrade Blockers"
+          name: Upgrade Blockers
         plugin:
-          kind: TimeSeriesChart
-          spec: {}
+          kind: StatChart
+          spec:
+            calculation: last
+            format:
+              unit: decimal
+              decimalPlaces: 0
+            thresholds:
+              mode: absolute
+              defaultColor: "#9CA3AF"
+              steps:
+              - value: 1
+                color: "#EF4444"
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'sum(upgrade_readiness_findings{severity="blocker"}) or vector(0)'
-
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: sum(max by (check) (upgrade_readiness_findings{namespace="testapp",job="readiness-checker",severity="blocker"}))
     cluster-upgradeable:
       kind: Panel
       spec:
         display:
-          name: "Cluster Upgradeable"
-          description: "1 = Yes, 0 = No"
+          name: Cluster Upgradeable
+          description: 1 = toegestaan, 0 = geblokkeerd. Geen data = onbekend. CRC heeft geen ondersteund upgradepad.
         plugin:
           kind: TimeSeriesChart
           spec: {}
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'count(upgrade_readiness_cluster_upgradeable{status="True"}) or vector(0)'
-
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: sum(upgrade_readiness_cluster_upgradeable{namespace="testapp",job="readiness-checker",status="True"}) or (0 * sum(upgrade_readiness_cluster_upgradeable{namespace="testapp",job="readiness-checker",status="False"}))
     deprecated-apis:
       kind: Panel
       spec:
         display:
-          name: "Deprecated APIs"
-          description: "Deprecated API usage detected by the readiness checker"
+          name: Deprecated APIs | waargenomen gebruik
+          description: Rechtstreeks van de API-server. Waarde 1 betekent dat deze verouderde API is aangeroepen, geen aantal requests of bewezen upgradeblokkade. Ook systeemclients kunnen de bron zijn.
         plugin:
           kind: TimeSeriesChart
           spec: {}
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'upgrade_readiness_deprecated_apis'
-
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: max by (group, version, resource, subresource, removed_release) (apiserver_requested_deprecated_apis)
     readiness-checks:
       kind: Panel
       spec:
         display:
-          name: "Readiness Checks by Category"
+          name: Dataverzameling | 1 = gelukt
         plugin:
           kind: TimeSeriesChart
           spec: {}
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'upgrade_readiness_check_success'
-
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: min by (check) (upgrade_readiness_check_success{namespace="testapp",job="readiness-checker"})
     assessment-complete:
       kind: Panel
       spec:
         display:
-          name: "Assessment Completion"
+          name: Volledigheid | 0 = onvolledig, 1 = volledig
         plugin:
           kind: TimeSeriesChart
           spec: {}
         queries:
-          - kind: TimeSeriesQuery
-            spec:
-              plugin:
-                kind: PrometheusTimeSeriesQuery
-                spec:
-                  datasource:
-                    kind: PrometheusDatasource
-                    name: thanos-datasource
-                  query: 'upgrade_readiness_assessment_complete'
-
-  layouts:
-    - kind: Grid
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: min by (check) (upgrade_readiness_assessment_complete{namespace="testapp",job="readiness-checker"})
+    api-count:
+      kind: Panel
       spec:
         display:
-          title: "Upgrade Readiness Overview"
-          collapse:
-            open: true
-        items:
-          - x: 0
-            y: 0
-            width: 2
-            height: 3
-            content:
-              "$ref": "#/spec/panels/degraded-operators"
+          name: Verouderde API-types
+          description: Aantal unieke waargenomen API-types. Dit is een aanvullende API-servermetric; de checkerbeoordeling blijft afzonderlijk zichtbaar.
+        plugin:
+          kind: StatChart
+          spec:
+            calculation: last
+            format:
+              unit: decimal
+              decimalPlaces: 0
+            thresholds:
+              mode: absolute
+              defaultColor: "#9CA3AF"
+              steps:
+              - value: 1
+                color: "#A78BFA"
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: count(max by (group, version, resource, subresource, removed_release) (apiserver_requested_deprecated_apis) > 0)
+    findings:
+      kind: Panel
+      spec:
+        display:
+          name: Bevindingen | blockers, warnings en unknown
+          description: Ontbrekende controles en onbekende resultaten mogen niet als groen worden geïnterpreteerd.
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: max by (check, severity) (upgrade_readiness_findings{namespace="testapp",job="readiness-checker"})
+    age:
+      kind: Panel
+      spec:
+        display:
+          name: Ouderdom laatste geslaagde scan | seconden
+          description: Boven 120 seconden zijn gegevens verouderd. Geen data betekent onbekend.
+        plugin:
+          kind: TimeSeriesChart
+          spec: {}
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                datasource:
+                  kind: PrometheusDatasource
+                  name: thanos-datasource
+                query: time() - min by (check) (upgrade_readiness_last_success_timestamp_seconds{namespace="testapp",job="readiness-checker"})
+    help:
+      kind: Panel
+      spec:
+        display:
+          name: KPN Hackathon | Platform Upgrade Readiness
+        plugin:
+          kind: Markdown
+          spec:
+            text: |-
+              [Open bevindingen en hersteladvies](https://readiness-checker-testapp.apps-crc01.testing/report)
 
-          - x: 2
-            y: 0
-            width: 2
-            height: 3
-            content:
-              "$ref": "#/spec/panels/available-operators"
+              **Leeswijzer:** uitlezen gelukt betekent niet upgradegereed. Controleer ook unknown, volledigheid en ouderdom. Geen data betekent onbekend.
 
-          - x: 0
-            y: 3
-            width: 2
-            height: 3
-            content:
-              "$ref": "#/spec/panels/upgrade-blockers"
-
-          - x: 2
-            y: 3
-            width: 2
-            height: 3
-            content:
-              "$ref": "#/spec/panels/cluster-upgradeable"
-
-          - x: 0
-            y: 6
-            width: 2
-            height: 4
-            content:
-              "$ref": "#/spec/panels/deprecated-apis"
-
-          - x: 2
-            y: 6
-            width: 2
-            height: 4
-            content:
-              "$ref": "#/spec/panels/readiness-checks"
-
-          - x: 0
-            y: 10
-            width: 4
-            height: 4
-            content:
-              "$ref": "#/spec/panels/assessment-complete"
+              **Demo-scope:** CRC heeft geen ondersteund upgradepad; standaard overrides blijven staan. De APIRequestCount-beoordeling is onvolledig. Algemene unsupported resources zijn nog niet beoordeeld.
+  layouts:
+  - kind: Grid
+    spec:
+      display:
+        title: Overzicht
+        collapse:
+          open: true
+      items:
+      - x: 0
+        y: 0
+        width: 6
+        height: 5
+        content:
+          "$ref": "#/spec/panels/upgrade-blockers"
+      - x: 6
+        y: 0
+        width: 6
+        height: 5
+        content:
+          "$ref": "#/spec/panels/degraded-operators"
+      - x: 12
+        y: 0
+        width: 6
+        height: 5
+        content:
+          "$ref": "#/spec/panels/available-operators"
+      - x: 18
+        y: 0
+        width: 6
+        height: 5
+        content:
+          "$ref": "#/spec/panels/api-count"
+  - kind: Grid
+    spec:
+      display:
+        title: API-gebruik en bevindingen
+        collapse:
+          open: true
+      items:
+      - x: 0
+        y: 0
+        width: 12
+        height: 9
+        content:
+          "$ref": "#/spec/panels/deprecated-apis"
+      - x: 12
+        y: 0
+        width: 12
+        height: 9
+        content:
+          "$ref": "#/spec/panels/findings"
+  - kind: Grid
+    spec:
+      display:
+        title: Betrouwbaarheid van de beoordeling
+        collapse:
+          open: true
+      items:
+      - x: 0
+        y: 0
+        width: 12
+        height: 8
+        content:
+          "$ref": "#/spec/panels/readiness-checks"
+      - x: 12
+        y: 0
+        width: 12
+        height: 8
+        content:
+          "$ref": "#/spec/panels/assessment-complete"
+      - x: 0
+        y: 8
+        width: 12
+        height: 8
+        content:
+          "$ref": "#/spec/panels/age"
+      - x: 12
+        y: 8
+        width: 12
+        height: 8
+        content:
+          "$ref": "#/spec/panels/cluster-upgradeable"
+  - kind: Grid
+    spec:
+      display:
+        title: Rapport en toelichting
+        collapse:
+          open: true
+      items:
+      - x: 0
+        y: 0
+        width: 24
+        height: 5
+        content:
+          "$ref": "#/spec/panels/help"
+  links:
+  - name: Rapport en hersteladvies
+    url: https://readiness-checker-testapp.apps-crc01.testing/report
