@@ -119,7 +119,7 @@ func TestOperatorAPIAndIndependentFailure(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &data); err != nil {
 				t.Fatal(err)
 			}
-			if len(data.Checks) != 2 || (tc.wantErr && data.Status != "unknown") {
+			if len(data.Checks) != 3 || (tc.wantErr && data.Status != "unknown") {
 				t.Fatalf("invalid combined report: %s", rec.Body.String())
 			}
 		})

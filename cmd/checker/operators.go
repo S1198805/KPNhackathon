@@ -149,7 +149,7 @@ func apiJSON(ctx context.Context, client *http.Client, address, tokenPath string
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
-		return fmt.Errorf("OpenShift API geeft HTTP %d; controleer bij 401/403 de leesrechten op clusteroperators en clusterversions", response.StatusCode)
+		return fmt.Errorf("OpenShift API geeft HTTP %d; controleer bij 401/403 de ServiceAccount-leesrechten op de opgevraagde resources", response.StatusCode)
 	}
 	if err := json.NewDecoder(response.Body).Decode(out); err != nil {
 		return fmt.Errorf("ongeldig OpenShift API-antwoord: %w", err)
@@ -260,11 +260,6 @@ func (s *operatorState) run() {
 	}
 }
 func operatorMetrics(w http.ResponseWriter, r operatorReport) {
-	complete := 0
-	if r.Success && r.Complete {
-		complete = 1
-	}
-	fmt.Fprintf(w, "# TYPE upgrade_readiness_assessment_complete gauge\nupgrade_readiness_assessment_complete{check=\"operators\"} %d\n", complete)
 	if !r.Success {
 		return
 	}
@@ -282,14 +277,15 @@ func operatorMetrics(w http.ResponseWriter, r operatorReport) {
 func (app *application) writeReport(w http.ResponseWriter) {
 	nodes, _ := app.snapshot()
 	operators, _ := app.operators.snapshot()
+	pdbs, _ := app.pdbs.snapshot()
 	status := "ok"
-	if nodes.Status == "error" || nodes.Status == "unknown" || !operators.Success || !operators.Complete {
+	if nodes.Status == "error" || nodes.Status == "unknown" || !operators.Success || !operators.Complete || !pdbs.Success || !pdbs.Complete {
 		status = "unknown"
 	}
-	if status == "ok" && operators.Status == "warning" {
+	if status == "ok" && (operators.Status == "warning" || pdbs.Status == "warning") {
 		status = "warning"
 	}
-	if nodes.Status == "blocker" || operators.Status == "blocker" {
+	if nodes.Status == "blocker" || operators.Status == "blocker" || pdbs.Status == "blocker" {
 		status = "blocker"
 	}
 	json.NewEncoder(w).Encode(struct {
@@ -298,9 +294,11 @@ func (app *application) writeReport(w http.ResponseWriter) {
 		Checks struct {
 			Nodes     report         `json:"nodes"`
 			Operators operatorReport `json:"operators"`
+			PDBs      pdbReport      `json:"pdbs"`
 		} `json:"checks"`
-	}{status, "Node Ready en ClusterOperators; overige upgradecontroles zijn nog niet uitgevoerd", struct {
+	}{status, "Node Ready, ClusterOperators en huidige PDB-drainbeperkingen; deprecated APIs en unsupported resources zijn nog niet beoordeeld", struct {
 		Nodes     report         `json:"nodes"`
 		Operators operatorReport `json:"operators"`
-	}{nodes, operators}})
+		PDBs      pdbReport      `json:"pdbs"`
+	}{nodes, operators, pdbs}})
 }
