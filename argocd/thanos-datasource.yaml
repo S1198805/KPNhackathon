@@ -5,9 +5,9 @@ metadata:
   namespace: testapp
 spec:
   config:
+    default: true
     display:
       name: OpenShift Thanos Querier
-      default: true
     plugin:
       kind: PrometheusDatasource
       spec:
