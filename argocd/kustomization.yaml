@@ -8,3 +8,4 @@ resources:
   - checker-rbac.yaml
   - readiness-checker-servicemonitor.yaml
   - thanos-datasource.yaml
+  - upgrade-readiness-dashboard.yaml
